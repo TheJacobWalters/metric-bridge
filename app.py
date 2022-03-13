@@ -1,8 +1,9 @@
 from flask import Flask
 from flask import request
+from base64 import b64decode as b64d
 import requests
 import socket
-
+import logging
 app = Flask(__name__)
 
 # this will have the form ?service=<service>namespace=<namespace>port=<port>protocol=<http or tcp>
@@ -19,14 +20,21 @@ def hello():
 
     # this could have Nones in here
     params = {x: request.args.get(x) for x in lookups}
+    if params["health_endpoint"] == None:
+        params["health_endpoint"] = ""
 
     res = None
-
+    authorization = request.headers.get('Authorization')
+    if authorization is not None:
+        username, password = b64d(authorization.split(' ')[1]).decode().split(":")
     def handle_http():
         if not all (params):
             raise Exception
         host = f"{params['schema']}://" + base_host + f":{params['port']}/{params['health_endpoint']}"
-        res = requests.get(host, verify=False)
+        headers = {}
+        if request.headers.get("Authorization") is not None:
+            headers['Authorization'] = request.headers.get("Authorization")
+        res = requests.get(host, verify=False, headers=headers)
         if res.status_code not in [200, 304]:
             raise Exception
 
@@ -44,7 +52,8 @@ def hello():
             handle_http()
         elif params["protocol"] == "tcp":
             handle_tcp()
-    except:
+    except Exception as e:
+        logging.error(e)
         return "", 500
 
     return "", 200
