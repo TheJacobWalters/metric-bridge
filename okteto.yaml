@@ -5,3 +5,4 @@ command:
 workdir: /opt/src/
 forward:
   - 25000:5000
+autocreate: true
