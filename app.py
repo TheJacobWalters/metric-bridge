@@ -2,6 +2,7 @@ from flask import Flask
 from flask import request
 import requests
 import socket
+
 app = Flask(__name__)
 
 # this will have the form ?service=<service>namespace=<namespace>port=<port>protocol=<http or tcp>
@@ -14,27 +15,40 @@ app = Flask(__name__)
 
 @app.route("/lookup")
 def hello():
-    lookups = ["service", "namespace", "port", "protocol", "schema"]
-    
+    lookups = ["service", "namespace", "port", "protocol", "schema", "health_endpoint"]
+
     # this could have Nones in here
-    params = {x : request.args.get(x) for x in lookups }
+    params = {x: request.args.get(x) for x in lookups}
 
     res = None
 
-    try :
-        base_host = f"{params['service']}.{params['namespace']}.svc.cluster.local"
-        if params['protocol'] in ["http", "https"] and all(params):
-            host = f"{params['schema']}://" + base_host + f":{params['port']}"
-            res = requests.get(host, verify=False)
-            
-        elif params['protocol'] == "tcp":
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((base_host, int(params['port'])))
-        else :
+    def handle_http():
+        if not all (params):
             raise Exception
-    except :
+        host = f"{params['schema']}://" + base_host + f":{params['port']}/{params['health_endpoint']}"
+        res = requests.get(host, verify=False)
+        if res.status_code not in [200, 304]:
+            raise Exception
+
+    def handle_tcp():
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((base_host, int(params["port"])))
+
+    # the service name and namespace plus the ending will always be in the dns record
+    try:
+        base_host = f"{params['service']}.{params['namespace']}.svc.cluster.local"
+    except:
         return "", 500
+    try:
+        if params["protocol"] in ["http", "https"]:
+            handle_http()
+        elif params["protocol"] == "tcp":
+            handle_tcp()
+    except:
+        return "", 500
+
     return "", 200
+
 
 if __name__ == "__main__":
     app.run()
