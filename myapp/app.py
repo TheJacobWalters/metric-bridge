@@ -14,16 +14,16 @@ app = Flask(__name__)
 # this will need to mount a service accoutn that can authenticate with the apiserver
 
 
+lookups = ["service", "namespace", "port", "protocol", "schema", "health_endpoint"]
 @app.route("/lookup")
 def hello():
-    lookups = ["service", "namespace", "port", "protocol", "schema", "health_endpoint"]
 
+    res = None
     # this could have Nones in here
     params = {x: request.args.get(x) for x in lookups}
     if params["health_endpoint"] == None:
         params["health_endpoint"] = ""
 
-    res = None
     authorization = request.headers.get('Authorization')
     if authorization is not None:
         username, password = b64d(authorization.split(' ')[1]).decode().split(":")
